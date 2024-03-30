@@ -9,6 +9,15 @@
         "shippingaddress":""
     },
     {
+        "username": "user2",
+        "password": "pass2",
+        "balance":100,
+        "type":"customer",
+        "name":"customer2",
+        "surname":"lastname2",
+        "shippingaddress":""
+    },
+    {
         "username": "admin",
         "password": "secret",
         "type": "admin"

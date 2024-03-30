@@ -22,21 +22,34 @@
             else{
             // Find the user in the data array
             const user = userData.find(user => user.username === username && user.password === password)
-            console.log(localStorage.user)
             if (user) {
                 document.getElementById('message').innerHTML = 'Login successful!';
                 // window.location.href = 'main.html';
                 if(user.type == 'customer' || user.type == 'admin'){
-                    if(!localStorage.user)//if user doesnt exist we write it to local storage
+                    if(!localStorage.user){
+                        localStorage.user = JSON.stringify(user)
+                        localStorage.users = JSON.stringify([user])}
+                    else{
+                        //const user = JSON.parse(localStorage.users)
+                        const users = JSON.parse(localStorage.users)
+                        let available = 0
+                        for (u in users){
+                            if(u.username == user.username)
+                            available = 1
+                        }
+                        if(available == 0){
+                            users.push(user)
+                        }
+                    
                     localStorage.user = JSON.stringify(user)
-                    const currUser = JSON.parse(localStorage.user)
-                    localStorage.user = JSON.stringify(currUser)
+                    localStorage.users = JSON.stringify(users)
+                }
                     body.innerHTML = mainHTML()
                     showBooks()
                 }
                 if(user.type == 'seller'){
-                    if(!localStorage.seller)
-                        localStorage.seller = JSON.stringify(user)
+                    // if(!localStorage.seller)
+                    localStorage.seller = JSON.stringify(user)
                     body.innerHTML = sellerHTML()
                     displaySellerBook()
                 }
@@ -203,6 +216,8 @@ function purchaseBook(id){
         const books = JSON.parse(localStorage.books)
         const purchaseHist = JSON.parse(localStorage.purchaseHist)
         const user = JSON.parse(localStorage.user)
+        const users = JSON.parse(localStorage.users)
+        const uindex = users.findIndex(u => u.username == user.username)
         //getting quantity value
         const quantityVal = document.getElementById('quantty').value;
         //finding the book that is currently being purchased
@@ -222,6 +237,8 @@ function purchaseBook(id){
         purchaseHist.push([books[index],user])
         localStorage.purchaseHist = JSON.stringify(purchaseHist)
         localStorage.user = JSON.stringify(user)
+        users[uindex] = user
+        localStorage.users = JSON.stringify(users)
         console.log(user.balance)
         //A message about the status of the purchase is shown to the customer
         document.getElementById('message').innerHTML = 'Purchase successful!';
@@ -249,7 +266,8 @@ async function showBooks(){//show books
             const data = await fetch('books.json')
             const books = await data.json()
             const user = JSON.parse(localStorage.user)
-
+            const users = JSON.parse(localStorage.users)
+            const index = users.findIndex(u => u.username == user.username)
             localStorage.books = JSON.stringify(books)
             const  purchaseHist = []
             localStorage.purchaseHist = JSON.stringify(purchaseHist)
@@ -261,7 +279,7 @@ async function showBooks(){//show books
     <div class="book-list">${booksHTML}</div>
     </div>`
     balance.innerHTML = `<p>Balance</p>
-    <p>$${user.balance}</p>`
+    <p>$${users[index].balance}</p>`
     // console.log(user.balance)
 
         }
@@ -270,6 +288,8 @@ async function showBooks(){//show books
             }
     else{//otherwise get books and other data from localstorage (to keep track of quantity and balance of user, etc.)
         const user = JSON.parse(localStorage.user)
+        const users = JSON.parse(localStorage.users)
+        const uindex = users.findIndex(u => u.username == user.username)
         const books = JSON.parse(localStorage.books)
         const booksHTML = books.map(book => bookToHTML(book)).join(' ')
         shop.innerHTML = `<div id="book-search" class="book-search">
@@ -279,13 +299,15 @@ async function showBooks(){//show books
     <div class="book-list">${booksHTML}</div>
     </div>`
     balance.innerHTML = `<p>Balance</p>
-    <p>$${user.balance}</p>`
+    <p>$${users[uindex].balance}</p>`
     }
     if(!localStorage.purchaseHist)
         purchaseHist = []
     else{//display purchase history if it exists
+        const user = JSON.parse(localStorage.user)
         const purchaseHist = JSON.parse(localStorage.purchaseHist)
-        const pHTML = purchaseHist.map(p => purchaseHTML(p[0],50-p[0].quantity)).join(' ')
+        const sellerBooksHist = purchaseHist.filter(p => p[1].username == user.username)
+        const pHTML = sellerBooksHist.map(p => purchaseHTML(p[0],50-p[0].quantity)).join(' ')
         // purchaseHist.map(p => console.log(p[1]))
         purchaseHistory.innerHTML = `<div class="purchases">${pHTML}</div>`
     }
@@ -303,6 +325,7 @@ function sellerBookToHTML(book){
              </div>
     </div>`
 }
+
 function bookDetailsPage(id){
     console.log(id)
     if(!localStorage.books)
@@ -361,10 +384,11 @@ async function displaySellerBook(){//without passing the seller
             const data = await fetch('books.json')
             const books = await data.json()
             const user = JSON.parse(localStorage.seller)
-    
+
+            //filter to display only the book by this seller
             const sellerBooks = books.filter(book => book.seller == user.username)
             // console.log(sellerBooks)
-            localStorage.sellerBooks = JSON.stringify(sellerBooks)
+            // localStorage.sellerBooks = JSON.stringify(sellerBooks)
             // localStorage.seller = JSON.stringify(user)
             const booksHTML = sellerBooks.map(book => sellerBookToHTML(book)).join(' ')
             shop.innerHTML = `<div id="book-search" class="book-search">
@@ -377,7 +401,8 @@ async function displaySellerBook(){//without passing the seller
             purchaseHist = []
             else{
             const purchaseHist = JSON.parse(localStorage.purchaseHist)
-            const pHTML = purchaseHist.map(p => soldHTML(p[0],50-p[0].quantity,p[0].price,p[1].username)).join(' ')
+            const sellerBooksHist = purchaseHist.filter(p => p[0].seller == user.username)
+            const pHTML = sellerBooksHist.map(p => soldHTML(p[0],50-p[0].quantity,p[0].price,p[1].username)).join(' ')
             purchaseHistory.innerHTML = `<div class="purchases">${pHTML}</div>`
         }
             } catch (error) {
@@ -386,9 +411,9 @@ async function displaySellerBook(){//without passing the seller
     }
     else{
         const user = JSON.parse(localStorage.seller)
-        const books = JSON.parse(localStorage.sellerBooks)
-        console.log(books)
-        const booksHTML = books.map(book => sellerBookToHTML(book)).join(' ')
+        const books = JSON.parse(localStorage.books)
+        const sellerBooks = books.filter(book => book.seller == user.username)
+        const booksHTML = sellerBooks.map(book => sellerBookToHTML(book)).join(' ')
         shop.innerHTML = `<div id="book-search" class="book-search">
         <input type=" text" id="search" placeholder="Search for book" size="50rem" class="inputs" >
     </div>
@@ -399,7 +424,10 @@ async function displaySellerBook(){//without passing the seller
         purchaseHist = []
         else{
         const purchaseHist = JSON.parse(localStorage.purchaseHist)
-        const pHTML = purchaseHist.map(p => soldHTML(p[0],50-p[0].quantity,p[0].price,p[1].username)).join(' ')
+        console.log("hi")
+        console.log(user.username)
+        const sellerBooksHist = purchaseHist.filter(p => p[1].seller == user.username)
+        const pHTML = sellerBooksHist.map(p => soldHTML(p[0],50-p[0].quantity,p[0].price,p[1].username)).join(' ')
         purchaseHistory.innerHTML = `<div class="purchases">${pHTML}</div>`
         }
     }
